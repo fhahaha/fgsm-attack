@@ -68,6 +68,7 @@ def build_training_graph(x, y, learning_rate, method, optimizer, decay_step):
 
     # Create the optimizer
     with tf.name_scope('Optimizer'):
+
         # Implement additional learning rate decay
         if decay_step:
             print('Using exponential learning rate decay every {:.2f} steps'.format(decay_step))
@@ -98,8 +99,6 @@ def build_training_graph(x, y, learning_rate, method, optimizer, decay_step):
 def build_eval_graph(x, y, scope):
     losses = {}
 
-    # TODO: Write image summary for perturbation and x_adv on test data
-
     with tf.variable_scope(scope, reuse=True):
         with tf.name_scope('Logits'):
             logits = train_utils.forward(x, create_summaries=False)
@@ -120,7 +119,7 @@ def build_eval_graph(x, y, scope):
             fgsm_perturbation, loss, raw_grad = train_utils.generate_adversarial_perturbation(x, ord='inf',
                                                                                               epsilon=FLAGS.eps_fgsm)
 
-            # Compute adversarial example
+            # Compute adversarial examples
             fgsm_x_adv_unclipped = x + fgsm_perturbation
             fgsm_x_adv = tf.clip_by_value(fgsm_x_adv_unclipped, clip_value_min=0.0, clip_value_max=1.0)
             fgsm_x_adv = tf.stop_gradient(fgsm_x_adv)  # do not backprop through attack
@@ -154,10 +153,13 @@ def evaluate(sess, x, y, fgsm_perturbation, fgsm_x_adv, X, Y, epoch, batch_size,
     batches = int(math.ceil(float(len(X)) / FLAGS.batch_size))
     indices = list(range(len(X)))
 
+    # Dictionary used to store evaluated metrics
     losses_eval_val = {}
 
+    # TODO: this is not optimal
+    # Create image summary of for clean images
     clean_images = tf.summary.image('test-images', x, max_outputs=2)
-    # Create image summary op for FGSM adversarial images
+    # Create image summary op for FGSM adversarial perturbations
     perturbations = tf.summary.image('fgsm-adversarial-test-perturbations', fgsm_perturbation, max_outputs=2)
     # Create image summary op for FGSM adversarial images
     fgsm_images = tf.summary.image('fgsm-adversarial-test-images', fgsm_x_adv, max_outputs=2)
@@ -189,6 +191,9 @@ def evaluate(sess, x, y, fgsm_perturbation, fgsm_x_adv, X, Y, epoch, batch_size,
         summary = tf.Summary()
         summary.value.add(tag='Evaluate/{:s}'.format(key), simple_value=losses_eval_val[key])
         file_writer.add_summary(summary, epoch + 1)
+
+        if key == 'LOSS':
+            print('Epoch: {:d}, Loss on test data: {:.4f}'.format(epoch + 1, losses_eval_val[key]))
 
         if key == 'ACC':
             print('Epoch: {:d}, Accuracy on test data: {:.4f}'.format(epoch + 1, losses_eval_val[key]))
@@ -311,6 +316,7 @@ def main(_):
                     print('\nStart of epoch {:d}...'.format(epoch + 1))
 
                     # Write summaries for optimizer parameters
+                    # TODO: For adaptive learning rate methods this does not log the adapted learning rate
                     if FLAGS.optimizer == 'vanilla':
                         learning_rate_val = optimizer._learning_rate
                     elif FLAGS.optimizer == 'momentum':
@@ -364,6 +370,9 @@ def main(_):
 
 
 if __name__ == "__main__":
+
+    # Example how to run a single experiment:
+    # python main.py --methods 'baseline' 'advt' --optimizer='adam' --learning_rate=0.001
 
     parser = argparse.ArgumentParser()
 
