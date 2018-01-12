@@ -13,7 +13,7 @@ import utils
 FLAGS = None
 
 
-def build_training_graph(x, y, learning_rate, method, optimizer, decay_step):
+def build_training_graph(x, y, learning_rate, method, optimizer, boundaries):
     print('\nBuilding training graph for method {:s}'.format(method))
     print('Using optimizer {:s}'.format(optimizer))
 
@@ -70,11 +70,10 @@ def build_training_graph(x, y, learning_rate, method, optimizer, decay_step):
     with tf.name_scope('Optimizer'):
 
         # Implement additional learning rate decay
-        if decay_step:
-            print('Using exponential learning rate decay every {:.2f} steps'.format(decay_step))
-            starter_learning_rate = learning_rate
-            learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step, decay_step, decay_rate=0.9,
-                                                       staircase=True)
+        if boundaries is not None:
+            print('Using piecewise constant learning rate decay with boundaries {0}'.format(boundaries))
+            values = [0.1, 0.05, 0.025]
+            learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
         else:
             learning_rate = tf.constant(learning_rate)
 
@@ -240,6 +239,9 @@ def main(_):
 
                     with tf.variable_scope('model') as scope:
                         with tf.name_scope('Training-Graph'):
+                            # Define boundaries for learning rate decay
+                            boundaries = None
+                            # boundaries = [500.0, 800.0]
                             # Build the model
                             loss, train_op, global_step, grads_and_vars, optimizer, perturbation, x_adv = build_training_graph(
                                 x,
@@ -247,7 +249,7 @@ def main(_):
                                 FLAGS.learning_rate,
                                 method,
                                 FLAGS.optimizer,
-                                FLAGS.decay_step)
+                                boundaries)
 
                             with tf.device('/cpu:0'):
                                 # Add summaries for the training losses
@@ -264,7 +266,7 @@ def main(_):
                                         if grad is not None:
                                             tf.summary.histogram(var.op.name + '/gradients', grad)
                                             grad_norm = tf.norm(grad, ord='euclidean')
-                                            tf.summary.scalar(var.op.name + '/gradients-l2norm', grad_norm)
+                                            tf.summary.scalar(var.op.name + '/gradients/l2norm', grad_norm)
 
                         with tf.name_scope('Eval-Graph'):
                             # Create ops used for evaluating the model on test data
