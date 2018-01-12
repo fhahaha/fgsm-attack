@@ -1,3 +1,4 @@
+import tensorflow as tf
 import layers as l
 import utils
 
@@ -12,6 +13,8 @@ def SimpleNet1(x, input_shape, neurons=1024, n_classes=10, non_linearity='relu',
     h = l.non_linearity(h, name=non_linearity)
     if create_summaries:
         utils.variable_summaries(h, name='activation-hidden-layer')
+        sparsity = tf.nn.zero_fraction(h, name='activation-hidden-layer-sparsity')
+        tf.summary.scalar(sparsity.op.name, sparsity)
 
     logits, output_shape = l.linear(output_shape, n_classes, h, name='output')
     if create_summaries:
